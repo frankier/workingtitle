@@ -1815,20 +1815,8 @@ dependencies = [
 
 [package.optional-dependencies]
 desktop = [
-    { name = "pywebview", marker = "sys_platform != 'linux'" },
-    { name = "uvicorn" },
-    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-desktop-build = [
     { name = "pyinstaller" },
     { name = "pyinstaller-hooks-contrib" },
-    { name = "pywebview", marker = "sys_platform != 'linux'" },
-    { name = "uvicorn" },
-    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-desktop-dev = [
     { name = "pywebview", marker = "sys_platform != 'linux'" },
     { name = "uvicorn" },
     { name = "watchfiles" },
@@ -1863,17 +1851,15 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2.7" },
-    { name = "pyinstaller", marker = "extra == 'desktop-build'", specifier = ">=6" },
-    { name = "pyinstaller-hooks-contrib", marker = "extra == 'desktop-build'" },
-    { name = "pywebview", marker = "sys_platform != 'linux' and extra == 'desktop'", specifier = ">=5" },
+    { name = "pyinstaller", marker = "extra == 'desktop'", specifier = ">=6" },
+    { name = "pyinstaller-hooks-contrib", marker = "extra == 'desktop'" },
+    { name = "pywebview", marker = "sys_platform != 'linux' and extra == 'desktop'", specifier = ">=6" },
     { name = "starlette", specifier = ">=0.37" },
     { name = "uvicorn", marker = "extra == 'desktop'", specifier = ">=0.30" },
-    { name = "watchfiles", marker = "extra == 'desktop-dev'", specifier = ">=1" },
+    { name = "watchfiles", marker = "extra == 'desktop'", specifier = ">=1" },
     { name = "websockets", marker = "extra == 'desktop'", specifier = ">=12" },
-    { name = "workingtitle", extras = ["desktop"], marker = "extra == 'desktop-build'" },
-    { name = "workingtitle", extras = ["desktop"], marker = "extra == 'desktop-dev'" },
 ]
-provides-extras = ["desktop", "desktop-dev", "desktop-build"]
+provides-extras = ["desktop"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8" }]

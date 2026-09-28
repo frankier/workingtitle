@@ -14,14 +14,8 @@ dependencies = [
 desktop = [
     "uvicorn>=0.30",
     "websockets>=12",
-    "pywebview>=5; sys_platform != 'linux'",
-]
-desktop-dev = [
-    "workingtitle[desktop]",
+    "pywebview>=6; sys_platform != 'linux'",
     "watchfiles>=1",
-]
-desktop-build = [
-    "workingtitle[desktop]",
     "pyinstaller>=6",
     "pyinstaller-hooks-contrib",
 ]

@@ -1,14 +1,12 @@
 # Desktop helpers
 
-`workingtitle.desktop` contains shared code extracted from APiToF Result Viewer
-and CTAP Dashboard. Neither application has been migrated yet. The runtime
-accepts an ASGI application; it does not require Starlette-specific routing.
+`workingtitle.desktop` contains shared code for launching and packaging ASGI
+desktop applications. The runtime accepts an ASGI application; it does not
+require Starlette-specific routing.
 
-Install `workingtitle[desktop]` for Uvicorn, WebSockets, and pywebview on Windows
-and macOS. `workingtitle[desktop-dev]` adds watchfiles;
-`workingtitle[desktop-build]` adds PyInstaller and its contributed hooks. Use
-both extras when developing and packaging. Importing `workingtitle.desktop`
-does not load these optional dependencies.
+Install `workingtitle[desktop]` for Uvicorn, WebSockets, watchfiles, PyInstaller
+and its contributed hooks, and pywebview on Windows and macOS. Importing
+`workingtitle.desktop` does not load these optional dependencies.
 
 ## Application and CLI
 
@@ -89,8 +87,6 @@ Common CLI options:
 | `--mode native` | Require a native window; propagate failures |
 | `--mode browser` | Serve and open the system browser |
 | `--mode server` | Serve without opening a window or browser |
-| `--no-window` | Select browser mode, overriding `--mode` |
-| `--no-browser` | Suppress system-browser opening, including fallback; native windows remain enabled |
 | `--reload` | Reload in browser/server mode; requires watchfiles and an unfrozen process |
 | `--debug` | Enable the configured debug environment flag and imply reload |
 | `--smoke-test` | Available only when a smoke callback is supplied |
@@ -100,10 +96,32 @@ smoke test. A smoke callback has signature `smoke_test(args, session) -> int`;
 it bypasses normal `prepare` and factory creation, so it can own temporary
 fixtures and configuration. It runs after asset validation/building.
 
-Applications can attach `SESSION` to their app state and inspect
-`session.window` for native dialogs. It is `None` outside a running native
-window. Invoke pywebview dialogs through that window; application-specific
-dialog behavior stays in the app. The GUI loop must run on the main thread.
+Applications can attach `SESSION` to their app state. `session.native` is true
+while a native window is open, and `session.window` is the underlying pywebview
+window or `None` in browser and server mode. The session also provides blocking
+dialog helpers that return `Path` objects:
+
+| Method | Returns |
+| --- | --- |
+| `open_folder(*, directory=None, allow_multiple=False)` | `tuple[Path, ...]`, empty when cancelled |
+| `open_file(*, directory=None, allow_multiple=False, file_types=())` | `tuple[Path, ...]`, empty when cancelled |
+| `save_file(*, directory=None, filename="", file_types=())` | `Path`, or `None` when cancelled |
+
+`file_types` uses pywebview's `"Description (*.ext1;*.ext2)"` format. The
+helpers raise `RuntimeError` when no window is open, so check `session.native`
+first. They block until the user dismisses the dialog; call them from a worker
+thread:
+
+```python
+from starlette.concurrency import run_in_threadpool
+
+if session.native:
+    chosen = await run_in_threadpool(session.open_folder, allow_multiple=True)
+```
+
+Applications that need behavior beyond these helpers can still use
+`session.window` directly. Application-specific dialog behavior stays in the
+app. The GUI loop must run on the main thread.
 
 `ServerThread(app, bind_socket(...))` is also a context manager for custom
 smoke checks. It owns startup readiness, shutdown, and socket cleanup.
@@ -141,7 +159,9 @@ ASSETS = AssetPlan(
 Pass `assets=ASSETS` to `run_cli` to build before startup and each reload.
 Call `ASSETS.ensure_built()` for an explicit build, or
 `ASSETS.ensure_built(force=True)` to run every step. No separate npm watcher is
-needed when using reload. Node/npm must already be installed.
+needed when using reload. Node/npm must already be installed. Development
+builds are tolerant by default; `ensure_built(strict=True)` makes a fallback an
+error, and packaging always uses strict mode.
 
 Paths and globs are root-relative. Inputs should include all compiler configs,
 templates, and sources affecting the output. npm steps automatically include
@@ -155,10 +175,15 @@ renaming also cause a rebuild. Missing output files cause a rebuild. Fingerprint
 state lives under `.desktop-build/`; add that directory to the application's
 ignore file. Do not run concurrent builds against the same output tree.
 
-Python actions are lazy `module:attribute` references to zero-argument
-functions. They must raise on failure and produce the declared outputs. An
-adapter around CTAP's current extension builder should force compilation and
-reject stale-bundle fallback during packaging. The extension compiler and its
+Python actions are lazy `module:attribute` references to callables. An action
+may take no arguments or a single `BuildContext`, which exposes `name`, `root`,
+`force`, and `strict`. It must produce the declared outputs, raise on failure,
+or raise `BuildUnavailable` to fall back to stale assets. A fallback never
+writes a fingerprint stamp, so the next call retries; `strict=True` (used by
+packaging) turns that fallback into an error. An adapter around an
+application's current extension builder can therefore attempt compilation in
+development, signal `BuildUnavailable` when only the stale bundle exists, and
+fail the package build under `strict=True`. The extension compiler and its
 bundle-integrity checks remain application-owned.
 
 Reload watches declared input globs, including nested sources, CSS, templates,
@@ -192,16 +217,19 @@ recipe = BundleSpec(
     packages=(PackageData("example"),),
     matplotlib=True,
     bundle_identifier="org.example.viewer",
-    version="0.1.0",
 )
 bundle = build_bundle(recipe, globals(), assets=ASSETS)
 ```
 
-Install the application in the build environment first. `build_bundle` builds
+Install the application in the build environment first. `BundleSpec.version`
+defaults to the installed distribution version (via `importlib.metadata`),
+falling back to `"0.1.0"` when the distribution is absent. Pass an explicit
+`version` only to override that. `build_bundle` builds
 assets before analysis, produces an onedir executable, and wraps it in a
 macOS `.app` when appropriate. It uses the PyInstaller constructors supplied
-by the `.spec` namespace. `analysis_options(recipe)` is available when an app
-needs to retain its own construction sequence.
+by the `.spec` namespace. Asset steps run with `force=True, strict=True`, so a
+stale-asset fallback aborts the package build. `analysis_options(recipe)` is
+available when an app needs to retain its own construction sequence.
 
 Recipes support package-data include/exclude patterns, distribution metadata,
 submodule collection with excluded prefixes, explicit hidden imports, raw data
@@ -212,9 +240,8 @@ beside the collected executable rather than into `_internal`.
 The app factory's module and Uvicorn's dynamically selected implementations
 are collected automatically. GUI backend collection follows AppSpec's native
 platform policy; supported native recipes are Windows and macOS. Domain-library
-recipes (MNE, Panel/Holoviews, APiToF simulation, mplbed, Bokeh extensions) stay
-in the consuming application. No broad scientific-library exclusions are
-applied implicitly.
+recipes (MNE, Panel/Holoviews, mplbed, Bokeh extensions) stay in the consuming
+application. No broad scientific-library exclusions are applied implicitly.
 
 `matplotlib=True` collects Matplotlib data/metadata and installs an early
 runtime hook that sets a writable cache under the executable's name. Existing

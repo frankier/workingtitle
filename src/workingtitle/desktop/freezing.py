@@ -7,6 +7,8 @@ recipes belong to the application, not to this module.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import partial
+import importlib.metadata
 from pathlib import Path
 import shutil
 import sys
@@ -25,7 +27,7 @@ class PackageData:
 @dataclass(frozen=True)
 class Submodules:
     package: str
-    exclude_prefixes: tuple[str, ...] = ()
+    filter: tuple[str, ...] | Callable[[str], bool] = ()
 
 
 @dataclass(frozen=True)
@@ -46,11 +48,24 @@ class BundleSpec:
     matplotlib: bool = False
     console: bool = True
     bundle_identifier: str | None = None
-    version: str = "0.1.0"
+    # Defaults to the version recorded for the app's distribution metadata.
+    version: str | None = None
     info_plist: Mapping[str, Any] = field(default_factory=dict)
     # Source files relative to root, copied beside the EXE after COLLECT.
     adjacent_files: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     data_filter: Callable | None = None
+
+    def __post_init__(self):
+        if self.version is None:
+            object.__setattr__(self, "version", distribution_version(self.app.name))
+
+
+def distribution_version(distribution: str) -> str:
+    """Installed version for ``distribution``, or a placeholder if uninstalled."""
+    try:
+        return importlib.metadata.version(distribution)
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0"
 
 
 def platform_options(app: AppSpec, platform: str | None = None):
@@ -75,6 +90,11 @@ def platform_options(app: AppSpec, platform: str | None = None):
             else ["webview.platforms.edgechromium", "webview.platforms.winforms"]
         )
     return hidden, excludes
+
+
+def _not_excluded(prefixes: tuple[str, ...], name: str) -> bool:
+    """Whether ``name`` lies outside every excluded module prefix."""
+    return not any(name == p or name.startswith(p + ".") for p in prefixes)
 
 
 def analysis_options(spec: BundleSpec):
@@ -105,13 +125,11 @@ def analysis_options(spec: BundleSpec):
     for package in spec.metadata:
         datas += copy_metadata(package)
     for group in spec.submodules:
-        prefixes = group.exclude_prefixes
-        hidden += collect_submodules(
-            group.package,
-            filter=lambda name: (
-                not any(name == p or name.startswith(p + ".") for p in prefixes)
-            ),
-        )
+        if isinstance(group.filter, tuple):
+            predicate = partial(_not_excluded, group.filter)
+        else:
+            predicate = group.filter
+        hidden += collect_submodules(group.package, filter=predicate)
     hooks = [str(root / path) for path in spec.runtime_hooks]
     if spec.matplotlib:
         datas += collect_data_files("matplotlib")
@@ -133,10 +151,12 @@ def build_bundle(spec: BundleSpec, namespace: Mapping[str, Any], *, assets=None)
     """Build onedir (plus .app on macOS) using the spec's PyInstaller globals.
 
     Call ``build_bundle(recipe, globals(), assets=plan)`` inside a .spec file.
-    Returns the COLLECT or BUNDLE object. Asset failures abort packaging.
+    Returns the COLLECT or BUNDLE object. Asset failures abort packaging: the
+    plan rebuilds with ``force=True, strict=True`` so it cannot fall back to
+    stale outputs the way development startup may.
     """
     if assets is not None:
-        assets.ensure_built(force=True)
+        assets.ensure_built(force=True, strict=True)
     root = Path(spec.root).resolve()
     analysis = namespace["Analysis"](
         [str(root / spec.entrypoint)], **analysis_options(spec)

@@ -1,3 +1,4 @@
+import importlib.metadata
 import os
 from pathlib import Path
 import runpy
@@ -102,6 +103,59 @@ def test_native_fallback_rebinds_and_respects_no_browser(monkeypatch):
     assert all(sock.fileno() == -1 for sock in sockets)
 
 
+def test_dialogs_use_the_native_window_and_return_paths(monkeypatch, tmp_path):
+    calls = []
+
+    class Window:
+        def create_file_dialog(self, kind, **kwargs):
+            calls.append((kind, kwargs))
+            selected = kwargs.get("save_filename") and (str(tmp_path / "conf.toml"),)
+            return selected or (str(tmp_path / "a"), str(tmp_path / "b"))
+
+    monkeypatch.setitem(
+        sys.modules,
+        "webview",
+        SimpleNamespace(FileDialog=SimpleNamespace(OPEN=10, FOLDER=20, SAVE=30)),
+    )
+    session = DesktopSession(app_spec())
+    assert not session.native
+    with pytest.raises(RuntimeError, match="no native window"):
+        session.open_folder()
+
+    session.window = Window()
+    assert session.native
+    assert session.open_folder(allow_multiple=True, directory=tmp_path) == (
+        tmp_path / "a",
+        tmp_path / "b",
+    )
+    assert session.open_file(file_types=("Data (*.txt)",)) == (
+        tmp_path / "a",
+        tmp_path / "b",
+    )
+    assert session.save_file(filename="conf.toml") == tmp_path / "conf.toml"
+    assert [kind for kind, _ in calls] == [20, 10, 30]
+    assert calls[0][1] == {
+        "directory": str(tmp_path),
+        "allow_multiple": True,
+        "save_filename": "",
+        "file_types": (),
+    }
+    assert calls[1][1]["file_types"] == ("Data (*.txt)",)
+    assert calls[1][1]["directory"] == ""
+    assert calls[2][1]["save_filename"] == "conf.toml"
+
+
+def test_save_dialog_cancelled_returns_none(monkeypatch):
+    monkeypatch.setitem(
+        sys.modules,
+        "webview",
+        SimpleNamespace(FileDialog=SimpleNamespace(SAVE=30)),
+    )
+    session = DesktopSession(app_spec())
+    session.window = SimpleNamespace(create_file_dialog=lambda *args, **kwargs: None)
+    assert session.save_file() is None
+
+
 def test_bind_failure_closes_socket(monkeypatch):
     sock = socket.socket()
     monkeypatch.setattr(runtime.socket, "socket", lambda *args: sock)
@@ -130,13 +184,13 @@ def test_cli_prepares_before_build_and_factory_and_restores_environment(monkeypa
     def launch(app, host, port, **kwargs):
         calls.append("launch")
         assert app == "app"
-        assert kwargs == {"mode": "browser", "open_browser": False}
+        assert kwargs == {"mode": "server"}
 
     monkeypatch.setattr(runtime, "import_object", lambda reference: factory)
     assert (
         run_cli(
             app_spec(),
-            ["--config", "new", "--no-window", "--no-browser"],
+            ["--config", "new", "--mode", "server"],
             add_arguments=lambda parser: parser.add_argument("--config"),
             prepare=prepare,
             assets=SimpleNamespace(ensure_built=build),
@@ -171,7 +225,7 @@ def test_reload_requires_watchfiles(monkeypatch, capsys):
     with pytest.raises(SystemExit) as exc:
         run_cli(app_spec(), ["--reload"])
     assert exc.value.code == 2
-    assert "desktop-dev" in capsys.readouterr().err
+    assert "watchfiles" in capsys.readouterr().err
 
 
 def test_reload_builds_before_restart_and_keeps_environment(monkeypatch):
@@ -201,7 +255,7 @@ def test_reload_builds_before_restart_and_keeps_environment(monkeypatch):
     )
     run_cli(
         app_spec(debug_env_var="EXAMPLE_DEBUG"),
-        ["--debug", "--no-browser"],
+        ["--debug", "--mode", "server"],
         assets=plan,
     )
     assert events == ["build", "build", "restart"]
@@ -250,6 +304,68 @@ def test_failed_build_is_retried(tmp_path, monkeypatch):
             plan.ensure_built()
     assert len(calls) == 2
     assert not (tmp_path / ".desktop-build/frontend.json").exists()
+
+
+def test_python_action_receives_build_context(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+    seen = []
+
+    def build(context):
+        seen.append(context)
+        (tmp_path / "out.js").write_text("compiled")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    plan.ensure_built(force=True, strict=True)
+    assert [(c.name, c.root, c.force, c.strict) for c in seen] == [
+        ("frontend", plan.root, True, True)
+    ]
+
+
+def test_fallback_to_stale_assets_is_retried(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+    (tmp_path / "out.js").write_text("stale")
+    calls = []
+
+    def build(context):
+        calls.append(context.strict)
+        if len(calls) == 1:
+            raise assets.BuildUnavailable("cannot compile")
+        (tmp_path / "out.js").write_text("fresh")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    plan.ensure_built()
+    assert (tmp_path / "out.js").read_text() == "stale"
+    # A fallback is not stamped, so the next call retries the step.
+    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+    plan.ensure_built()
+    assert (tmp_path / "out.js").read_text() == "fresh"
+    assert (tmp_path / ".desktop-build/frontend.json").is_file()
+    assert calls == [False, False]
+
+
+def test_strict_fallback_raises_and_is_not_stamped(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+    (tmp_path / "out.js").write_text("stale")
+
+    def build(context):
+        assert context.strict
+        raise assets.BuildUnavailable("stale only")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    with pytest.raises(assets.BuildUnavailable, match="stale only"):
+        plan.ensure_built(force=True, strict=True)
+    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+
+
+def test_fallback_without_stale_outputs_raises(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+
+    def build(context):
+        raise assets.BuildUnavailable("nothing built")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    with pytest.raises(assets.BuildUnavailable, match="nothing built"):
+        plan.ensure_built()
 
 
 @pytest.mark.parametrize("frozen", [False, True])
@@ -384,11 +500,35 @@ def test_bundle_build_order_filter_and_adjacent_files(tmp_path, monkeypatch):
     freezing.build_bundle(
         spec,
         namespace,
-        assets=SimpleNamespace(ensure_built=lambda **kw: events.append("build")),
+        assets=SimpleNamespace(ensure_built=lambda **kw: events.append(("build", kw))),
     )
-    assert events == ["build", "analysis"]
+    assert events == [("build", {"force": True, "strict": True}), "analysis"]
     assert analysis.datas == [("keep",)]
     assert (tmp_path / "dist/example.exe.config").read_text() == "config"
+
+
+def test_bundle_version_defaults_to_distribution_metadata(monkeypatch):
+    monkeypatch.setattr(importlib.metadata, "version", lambda name: f"9.9.9+{name}")
+    spec = freezing.BundleSpec(app_spec(), "main.py", Path("tmp"))
+    assert spec.version == "9.9.9+example"
+
+
+def test_bundle_version_overrides_metadata(monkeypatch):
+    def fail(name):
+        raise AssertionError("explicit version must not read metadata")
+
+    monkeypatch.setattr(importlib.metadata, "version", fail)
+    spec = freezing.BundleSpec(app_spec(), "main.py", Path("tmp"), version="1.2.3")
+    assert spec.version == "1.2.3"
+
+
+def test_bundle_version_falls_back_when_distribution_missing(monkeypatch):
+    def missing(name):
+        raise importlib.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(importlib.metadata, "version", missing)
+    spec = freezing.BundleSpec(app_spec(), "main.py", Path("tmp"))
+    assert spec.version == "0.1.0"
 
 
 def test_matplotlib_hook_uses_app_cache_and_respects_override(tmp_path, monkeypatch):
