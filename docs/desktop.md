@@ -1,8 +1,8 @@
 # Desktop helpers
 
-`workingtitle.desktop` contains shared code extracted from APiToF Result Viewer
-and CTAP Dashboard. Neither application has been migrated yet. The runtime
-accepts an ASGI application; it does not require Starlette-specific routing.
+`workingtitle.desktop` contains shared code for launching and packaging ASGI
+desktop applications. The runtime accepts an ASGI application; it does not
+require Starlette-specific routing.
 
 Install `workingtitle[desktop]` for Uvicorn, WebSockets, and pywebview on Windows
 and macOS. `workingtitle[desktop-dev]` adds watchfiles;
@@ -184,11 +184,11 @@ may take no arguments or a single `BuildContext`, which exposes `name`, `root`,
 `force`, and `strict`. It must produce the declared outputs, raise on failure,
 or raise `BuildUnavailable` to fall back to stale assets. A fallback never
 writes a fingerprint stamp, so the next call retries; `strict=True` (used by
-packaging) turns that fallback into an error. An adapter around CTAP's current
-extension builder can therefore attempt compilation in development, signal
-`BuildUnavailable` when only the stale bundle exists, and fail the package
-build under `strict=True`. The extension compiler and its bundle-integrity
-checks remain application-owned.
+packaging) turns that fallback into an error. An adapter around an
+application's current extension builder can therefore attempt compilation in
+development, signal `BuildUnavailable` when only the stale bundle exists, and
+fail the package build under `strict=True`. The extension compiler and its
+bundle-integrity checks remain application-owned.
 
 Reload watches declared input globs, including nested sources, CSS, templates,
 and npm manifests. Generated outputs, build state, `node_modules`, virtualenvs,
@@ -242,9 +242,8 @@ beside the collected executable rather than into `_internal`.
 The app factory's module and Uvicorn's dynamically selected implementations
 are collected automatically. GUI backend collection follows AppSpec's native
 platform policy; supported native recipes are Windows and macOS. Domain-library
-recipes (MNE, Panel/Holoviews, APiToF simulation, mplbed, Bokeh extensions) stay
-in the consuming application. No broad scientific-library exclusions are
-applied implicitly.
+recipes (MNE, Panel/Holoviews, mplbed, Bokeh extensions) stay in the consuming
+application. No broad scientific-library exclusions are applied implicitly.
 
 `matplotlib=True` collects Matplotlib data/metadata and installs an early
 runtime hook that sets a writable cache under the executable's name. Existing

@@ -1,4 +1,4 @@
-"""CLI and desktop lifecycle extracted from APiToF Result Viewer and CTAP.
+"""CLI and desktop lifecycle for ASGI desktop applications.
 
 Application factories and preparation callbacks stay in the application.
 Uvicorn and pywebview are imported only when their functionality is used.
