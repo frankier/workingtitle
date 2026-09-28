@@ -1,5 +1,12 @@
 # workingtitle
 
+Shared helpers for Python web applications:
+
+- `workingtitle.pydanticstarlette`: query-parameter validation.
+- `workingtitle.desktop`: ASGI desktop launching, frontend builds, and
+  PyInstaller packaging. See the [desktop guide](docs/desktop.md) for configuration
+  and integration examples.
+
 Robot text below.
 
 Query-parameter validation for plain Starlette applications, backed by

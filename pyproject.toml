@@ -1,7 +1,7 @@
 [project]
 name = "workingtitle"
 version = "0.1.0"
-description = "Query-parameter validation for Starlette handlers, backed by Pydantic models"
+description = "Small web-app helpers for validation, desktop hosting, and packaging"
 readme = "README.md"
 license = { file = "LICENCE" }
 requires-python = ">=3.10"
@@ -10,12 +10,31 @@ dependencies = [
     "starlette>=0.37",
 ]
 
+[project.optional-dependencies]
+desktop = [
+    "uvicorn>=0.30",
+    "websockets>=12",
+    "pywebview>=5; sys_platform != 'linux'",
+]
+desktop-dev = [
+    "workingtitle[desktop]",
+    "watchfiles>=1",
+]
+desktop-build = [
+    "workingtitle[desktop]",
+    "pyinstaller>=6",
+    "pyinstaller-hooks-contrib",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
 ]
 test = [
     "pytest>=8",
+    "uvicorn>=0.30",
+    "websockets>=12",
+    "watchfiles>=1",
 ]
 
 [build-system]
