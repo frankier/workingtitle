@@ -1,0 +1,50 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # sphinx-polyversion builds one version per git ref
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install Python
+        # before the parallel version builds start downloading it themselves
+        run: uv python install
+
+      - name: Install docs dependencies
+        run: uv sync --group docs
+
+      - name: Create a local main branch
+        # sphinx-polyversion only builds local branches and tags
+        run: git rev-parse --verify --quiet refs/heads/main || git branch main HEAD
+
+      - name: Build docs
+        run: uv run sphinx-polyversion -vv docs/poly.py
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

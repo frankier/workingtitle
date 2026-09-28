@@ -2,60 +2,44 @@
 
 Shared helpers for Python web applications:
 
-- `workingtitle.pydanticstarlette`: query-parameter validation.
+- `workingtitle.pydanticstarlette`: query-parameter validation for plain
+  Starlette applications, backed by Pydantic models.
 - `workingtitle.desktop`: ASGI desktop launching, frontend builds, and
-  PyInstaller packaging. See the [desktop guide](docs/desktop.md) for configuration
-  and integration examples.
+  PyInstaller packaging.
 
-Robot text below.
+## Installation
 
-Query-parameter validation for plain Starlette applications, backed by
-Pydantic models. FastAPI style validation without the framework — no
-OpenAPI, no dependency injection, no routing changes.
+    $ uv add workingtitle
 
-## Usage
+The desktop helpers live behind extras: `workingtitle[desktop]`,
+`workingtitle[desktop-dev]`, and `workingtitle[desktop-build]`.
 
-```python
-from pydantic import BaseModel
-from workingtitle.pydanticstarlette import PositiveInt, Sorters, query_params
+## Documentation
 
+The docs are published at <https://frankier.github.io/workingtitle/>, which
+redirects to the newest version. Every release is built under its own version
+and the sidebar links between them.
 
-class ReportParams(BaseModel):
-    report: ReportType
-    page: PositiveInt = 1
-    sorters: Sorters = Field(default_factory=list, validation_alias="sort")
+- [Pydantic Starlette guide](https://frankier.github.io/workingtitle/pydanticstarlette/)
+- [Desktop guide](https://frankier.github.io/workingtitle/desktop/)
+- [API reference](https://frankier.github.io/workingtitle/api/)
 
+Build the docs for every version, or only for the working tree:
 
-@query_params(ReportParams)
-async def report_data(request, params):
-    ...  # params is a validated ReportParams
-```
+    $ uv run sphinx-polyversion docs/poly.py
+    $ uv run sphinx-polyversion -l docs/poly.py
 
-Invalid input never reaches the handler: it becomes a `400` plain-text
-response naming the offending parameter. `ValueError` raised inside the
-handler body (e.g. "Unknown sort field") also becomes a 400; Starlette
-`HTTPException` (e.g. 404 lookups) propagates untouched.
+## Contributing
 
-`@query_params()` with no model wraps a handler purely for the error
-mapping, without injecting anything.
+Set up a dev environment with [uv](https://docs.astral.sh/uv/):
 
-## Building blocks
+    $ uv sync --all-groups --all-extras
 
-| Export | Purpose |
-| --- | --- |
-| `query_params(model=None)` | Handler decorator: validate + inject, map errors to 400 |
-| `parse_query(query, model)` | Same parsing outside a handler (e.g. in helpers) |
-| `collect_query_params(query)` | Flattens scalars and `name[i][part]` indexed groups |
-| `LenientInt` | `maybe_int` semantics: unparseable falls back to `None` |
-| `PositiveInt` / `OptionalPositiveInt` | Strict `>= 1` integers for pagination etc. |
-| `int_or("all")` | Integers that also accept sentinel strings |
-| `json_list_of(str)` | A JSON-encoded list inside one query parameter |
-| `FileStem` | Safe bare file name (no separators or `..`) |
-| `Sorters` | Tabulator remote-sort `sort[n][field/dir]` tuples |
-| `require_found(value, options, label)` | 404 unless the value is a known id |
-| `ParamError` | `ValueError` subclass for parameter errors in app code |
+Run the tests:
 
-Indexed keys (`sort[0][field]=id`) are grouped by `collect_query_params`
-into `{"sort": [{"field": "id", ...}]}` (ordered by index), so a model
-field picks them up via `validation_alias="sort"`. Malformed or repeated
-indexed keys are rejected instead of silently ignored.
+    $ uv run pytest
+
+Lint and format:
+
+    $ uv run ruff check ./src
+    $ uv run ruff format ./src

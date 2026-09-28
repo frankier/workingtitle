@@ -36,6 +36,13 @@ test = [
     "websockets>=12",
     "watchfiles>=1",
 ]
+docs = [
+    "sphinx>=8",
+    "myst-parser>=4",
+    "sphinx-autodoc-typehints>=2",
+    "furo>=2024",
+    "sphinx-polyversion[jinja]>=3",
+]
 
 [build-system]
 requires = ["uv_build >= 0.11.7, <0.12.0"]
