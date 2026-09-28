@@ -5,12 +5,54 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import subprocess
 import sys
 
 from .runtime import import_object
+
+
+class BuildUnavailable(RuntimeError):
+    """A build action cannot produce fresh outputs but stale ones may exist.
+
+    Raise this from a :class:`PythonBuild` action to fall back to previously
+    built assets without claiming success. ``ensure_built(strict=False)`` keeps
+    the stale outputs and retries on the next call; strict packaging re-raises.
+    A fallback never writes a fingerprint stamp.
+    """
+
+
+@dataclass(frozen=True)
+class BuildContext:
+    """Policy passed to :class:`PythonBuild` actions that accept one argument.
+
+    ``force`` re-runs even when the fingerprint matches. ``strict`` is true for
+    packaging: fall back to stale assets in development, but fail the build.
+    """
+
+    name: str
+    root: Path
+    force: bool
+    strict: bool
+
+
+def _accepts_context(action):
+    """Return true when an action can receive a positional BuildContext."""
+    try:
+        parameters = inspect.signature(action).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        parameter.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.VAR_POSITIONAL,
+        )
+        for parameter in parameters
+    )
 
 
 @dataclass(frozen=True)
@@ -25,9 +67,13 @@ class NpmBuild:
 
 @dataclass(frozen=True)
 class PythonBuild:
-    """A lazy zero-argument callable; failures must raise an exception.
+    """A lazy action reference that builds the declared outputs.
 
-    Use an app-owned wrapper when the compiler needs flags or validation.
+    The action is a ``module:attribute`` reference to a callable. It may take
+    either no arguments or a single :class:`BuildContext`. It must produce the
+    declared outputs, raise on failure, or raise :class:`BuildUnavailable` to
+    fall back to stale assets. Use an app-owned wrapper when the compiler needs
+    flags or validation.
     """
 
     name: str
@@ -154,7 +200,13 @@ class AssetPlan:
                 f"{step.name}: missing built assets: {', '.join(missing)}"
             )
 
-    def ensure_built(self, *, force=False):
+    def ensure_built(self, *, force=False, strict=False):
+        """Build stale steps, or validate outputs when not in source mode.
+
+        A step whose action raises :class:`BuildUnavailable` is retried later
+        without a fingerprint stamp. With ``strict=True`` that fallback is an
+        error instead, so packaging cannot ship stale assets.
+        """
         if not self.source or getattr(sys, "frozen", False):
             for step in self.steps:
                 self._validate(step)
@@ -169,10 +221,24 @@ class AssetPlan:
             present = all((self.root / path).is_file() for path in step.outputs)
             if not force and present and previous == fingerprint:
                 continue
+            context = BuildContext(
+                name=step.name, root=self.root, force=force, strict=strict
+            )
             if isinstance(step, NpmBuild):
                 self._npm_build(step)
             else:
-                import_object(step.action)()
+                action = import_object(step.action)
+                try:
+                    if _accepts_context(action):
+                        action(context)
+                    else:
+                        action()
+                except BuildUnavailable:
+                    if strict or not present:
+                        raise
+                    # Leave the previous stamp in place so the next call
+                    # retries instead of treating stale outputs as fresh.
+                    continue
             self._validate(step)
             # Record the inputs observed before compilation: edits made while
             # building must still invalidate the result on the next check.

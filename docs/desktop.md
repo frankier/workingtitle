@@ -163,7 +163,9 @@ ASSETS = AssetPlan(
 Pass `assets=ASSETS` to `run_cli` to build before startup and each reload.
 Call `ASSETS.ensure_built()` for an explicit build, or
 `ASSETS.ensure_built(force=True)` to run every step. No separate npm watcher is
-needed when using reload. Node/npm must already be installed.
+needed when using reload. Node/npm must already be installed. Development
+builds are tolerant by default; `ensure_built(strict=True)` makes a fallback an
+error, and packaging always uses strict mode.
 
 Paths and globs are root-relative. Inputs should include all compiler configs,
 templates, and sources affecting the output. npm steps automatically include
@@ -177,11 +179,16 @@ renaming also cause a rebuild. Missing output files cause a rebuild. Fingerprint
 state lives under `.desktop-build/`; add that directory to the application's
 ignore file. Do not run concurrent builds against the same output tree.
 
-Python actions are lazy `module:attribute` references to zero-argument
-functions. They must raise on failure and produce the declared outputs. An
-adapter around CTAP's current extension builder should force compilation and
-reject stale-bundle fallback during packaging. The extension compiler and its
-bundle-integrity checks remain application-owned.
+Python actions are lazy `module:attribute` references to callables. An action
+may take no arguments or a single `BuildContext`, which exposes `name`, `root`,
+`force`, and `strict`. It must produce the declared outputs, raise on failure,
+or raise `BuildUnavailable` to fall back to stale assets. A fallback never
+writes a fingerprint stamp, so the next call retries; `strict=True` (used by
+packaging) turns that fallback into an error. An adapter around CTAP's current
+extension builder can therefore attempt compilation in development, signal
+`BuildUnavailable` when only the stale bundle exists, and fail the package
+build under `strict=True`. The extension compiler and its bundle-integrity
+checks remain application-owned.
 
 Reload watches declared input globs, including nested sources, CSS, templates,
 and npm manifests. Generated outputs, build state, `node_modules`, virtualenvs,
@@ -222,8 +229,9 @@ bundle = build_bundle(recipe, globals(), assets=ASSETS)
 Install the application in the build environment first. `build_bundle` builds
 assets before analysis, produces an onedir executable, and wraps it in a
 macOS `.app` when appropriate. It uses the PyInstaller constructors supplied
-by the `.spec` namespace. `analysis_options(recipe)` is available when an app
-needs to retain its own construction sequence.
+by the `.spec` namespace. Asset steps run with `force=True, strict=True`, so a
+stale-asset fallback aborts the package build. `analysis_options(recipe)` is
+available when an app needs to retain its own construction sequence.
 
 Recipes support package-data include/exclude patterns, distribution metadata,
 submodule collection with excluded prefixes, explicit hidden imports, raw data

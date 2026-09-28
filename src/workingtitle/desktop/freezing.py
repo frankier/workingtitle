@@ -137,10 +137,12 @@ def build_bundle(spec: BundleSpec, namespace: Mapping[str, Any], *, assets=None)
     """Build onedir (plus .app on macOS) using the spec's PyInstaller globals.
 
     Call ``build_bundle(recipe, globals(), assets=plan)`` inside a .spec file.
-    Returns the COLLECT or BUNDLE object. Asset failures abort packaging.
+    Returns the COLLECT or BUNDLE object. Asset failures abort packaging: the
+    plan rebuilds with ``force=True, strict=True`` so it cannot fall back to
+    stale outputs the way development startup may.
     """
     if assets is not None:
-        assets.ensure_built(force=True)
+        assets.ensure_built(force=True, strict=True)
     root = Path(spec.root).resolve()
     analysis = namespace["Analysis"](
         [str(root / spec.entrypoint)], **analysis_options(spec)

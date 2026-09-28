@@ -305,6 +305,68 @@ def test_failed_build_is_retried(tmp_path, monkeypatch):
     assert not (tmp_path / ".desktop-build/frontend.json").exists()
 
 
+def test_python_action_receives_build_context(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+    seen = []
+
+    def build(context):
+        seen.append(context)
+        (tmp_path / "out.js").write_text("compiled")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    plan.ensure_built(force=True, strict=True)
+    assert [(c.name, c.root, c.force, c.strict) for c in seen] == [
+        ("frontend", plan.root, True, True)
+    ]
+
+
+def test_fallback_to_stale_assets_is_retried(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+    (tmp_path / "out.js").write_text("stale")
+    calls = []
+
+    def build(context):
+        calls.append(context.strict)
+        if len(calls) == 1:
+            raise assets.BuildUnavailable("cannot compile")
+        (tmp_path / "out.js").write_text("fresh")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    plan.ensure_built()
+    assert (tmp_path / "out.js").read_text() == "stale"
+    # A fallback is not stamped, so the next call retries the step.
+    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+    plan.ensure_built()
+    assert (tmp_path / "out.js").read_text() == "fresh"
+    assert (tmp_path / ".desktop-build/frontend.json").is_file()
+    assert calls == [False, False]
+
+
+def test_strict_fallback_raises_and_is_not_stamped(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+    (tmp_path / "out.js").write_text("stale")
+
+    def build(context):
+        assert context.strict
+        raise assets.BuildUnavailable("stale only")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    with pytest.raises(assets.BuildUnavailable, match="stale only"):
+        plan.ensure_built(force=True, strict=True)
+    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+
+
+def test_fallback_without_stale_outputs_raises(tmp_path, monkeypatch):
+    plan = python_plan(tmp_path)
+
+    def build(context):
+        raise assets.BuildUnavailable("nothing built")
+
+    monkeypatch.setattr(assets, "import_object", lambda reference: build)
+    with pytest.raises(assets.BuildUnavailable, match="nothing built"):
+        plan.ensure_built()
+
+
 @pytest.mark.parametrize("frozen", [False, True])
 def test_installed_or_frozen_only_validates_outputs(tmp_path, monkeypatch, frozen):
     plan = python_plan(tmp_path)
@@ -437,9 +499,9 @@ def test_bundle_build_order_filter_and_adjacent_files(tmp_path, monkeypatch):
     freezing.build_bundle(
         spec,
         namespace,
-        assets=SimpleNamespace(ensure_built=lambda **kw: events.append("build")),
+        assets=SimpleNamespace(ensure_built=lambda **kw: events.append(("build", kw))),
     )
-    assert events == ["build", "analysis"]
+    assert events == [("build", {"force": True, "strict": True}), "analysis"]
     assert analysis.datas == [("keep",)]
     assert (tmp_path / "dist/example.exe.config").read_text() == "config"
 

@@ -3,7 +3,7 @@
 Importing this package does not import a GUI, compiler, or ASGI server.
 """
 
-from .assets import AssetPlan, NpmBuild, PythonBuild
+from .assets import AssetPlan, BuildContext, BuildUnavailable, NpmBuild, PythonBuild
 from .runtime import (
     AppSpec,
     DesktopSession,
@@ -19,6 +19,8 @@ from .runtime import (
 __all__ = [
     "AppSpec",
     "AssetPlan",
+    "BuildContext",
+    "BuildUnavailable",
     "DesktopSession",
     "NpmBuild",
     "PythonBuild",
