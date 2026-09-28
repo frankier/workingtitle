@@ -122,7 +122,9 @@ class TestFileStem:
 
         assert M(name="1003P_epochs.set").name == "1003P_epochs.set"
 
-    @pytest.mark.parametrize("value", ["", ".", "..", "../x", "a/b", "a\\b", "/etc/passwd"])
+    @pytest.mark.parametrize(
+        "value", ["", ".", "..", "../x", "a/b", "a\\b", "/etc/passwd"]
+    )
     def test_rejects_paths(self, value):
         class M(BaseModel):
             name: FileStem
@@ -136,7 +138,9 @@ class TestCollectQueryParams:
         assert collect_query_params({"a": "1"}) == {"a": "1"}
 
     def test_scalars_and_indexed_groups(self):
-        query = QueryParams("a=1&b=2&sort[1][dir]=desc&sort[0][field]=id&sort[0][dir]=asc")
+        query = QueryParams(
+            "a=1&b=2&sort[1][dir]=desc&sort[0][field]=id&sort[0][dir]=asc"
+        )
         assert collect_query_params(query) == {
             "a": "1",
             "b": "2",

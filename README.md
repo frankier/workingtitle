@@ -11,7 +11,7 @@ Robot text below.
 
 Query-parameter validation for plain Starlette applications, backed by
 Pydantic models. FastAPI style validation without the framework — no
-OpenAPI, no dependency injection, no routing changes. 
+OpenAPI, no dependency injection, no routing changes.
 
 ## Usage
 

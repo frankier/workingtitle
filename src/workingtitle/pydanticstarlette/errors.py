@@ -31,4 +31,6 @@ def error_message(exc: Exception) -> str:
 
 
 def error_response(exc: Exception, status_code: int = 400) -> Response:
-    return Response(error_message(exc), status_code=status_code, media_type="text/plain")
+    return Response(
+        error_message(exc), status_code=status_code, media_type="text/plain"
+    )
