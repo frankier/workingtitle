@@ -221,12 +221,14 @@ recipe = BundleSpec(
     packages=(PackageData("example"),),
     matplotlib=True,
     bundle_identifier="org.example.viewer",
-    version="0.1.0",
 )
 bundle = build_bundle(recipe, globals(), assets=ASSETS)
 ```
 
-Install the application in the build environment first. `build_bundle` builds
+Install the application in the build environment first. `BundleSpec.version`
+defaults to the installed distribution version (via `importlib.metadata`),
+falling back to `"0.1.0"` when the distribution is absent. Pass an explicit
+`version` only to override that. `build_bundle` builds
 assets before analysis, produces an onedir executable, and wraps it in a
 macOS `.app` when appropriate. It uses the PyInstaller constructors supplied
 by the `.spec` namespace. Asset steps run with `force=True, strict=True`, so a

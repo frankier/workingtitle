@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import partial
+import importlib.metadata
 from pathlib import Path
 import shutil
 import sys
@@ -47,11 +48,24 @@ class BundleSpec:
     matplotlib: bool = False
     console: bool = True
     bundle_identifier: str | None = None
-    version: str = "0.1.0"
+    # Defaults to the version recorded for the app's distribution metadata.
+    version: str | None = None
     info_plist: Mapping[str, Any] = field(default_factory=dict)
     # Source files relative to root, copied beside the EXE after COLLECT.
     adjacent_files: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     data_filter: Callable | None = None
+
+    def __post_init__(self):
+        if self.version is None:
+            object.__setattr__(self, "version", distribution_version(self.app.name))
+
+
+def distribution_version(distribution: str) -> str:
+    """Installed version for ``distribution``, or a placeholder if uninstalled."""
+    try:
+        return importlib.metadata.version(distribution)
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0"
 
 
 def platform_options(app: AppSpec, platform: str | None = None):

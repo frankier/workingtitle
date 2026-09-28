@@ -1,3 +1,4 @@
+import importlib.metadata
 import os
 from pathlib import Path
 import runpy
@@ -504,6 +505,30 @@ def test_bundle_build_order_filter_and_adjacent_files(tmp_path, monkeypatch):
     assert events == [("build", {"force": True, "strict": True}), "analysis"]
     assert analysis.datas == [("keep",)]
     assert (tmp_path / "dist/example.exe.config").read_text() == "config"
+
+
+def test_bundle_version_defaults_to_distribution_metadata(monkeypatch):
+    monkeypatch.setattr(importlib.metadata, "version", lambda name: f"9.9.9+{name}")
+    spec = freezing.BundleSpec(app_spec(), "main.py", Path("tmp"))
+    assert spec.version == "9.9.9+example"
+
+
+def test_bundle_version_overrides_metadata(monkeypatch):
+    def fail(name):
+        raise AssertionError("explicit version must not read metadata")
+
+    monkeypatch.setattr(importlib.metadata, "version", fail)
+    spec = freezing.BundleSpec(app_spec(), "main.py", Path("tmp"), version="1.2.3")
+    assert spec.version == "1.2.3"
+
+
+def test_bundle_version_falls_back_when_distribution_missing(monkeypatch):
+    def missing(name):
+        raise importlib.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(importlib.metadata, "version", missing)
+    spec = freezing.BundleSpec(app_spec(), "main.py", Path("tmp"))
+    assert spec.version == "0.1.0"
 
 
 def test_matplotlib_hook_uses_app_cache_and_respects_override(tmp_path, monkeypatch):
