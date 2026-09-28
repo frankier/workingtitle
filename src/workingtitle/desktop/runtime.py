@@ -361,9 +361,7 @@ def run_cli(
     if reload and (
         getattr(sys, "frozen", False) or importlib.util.find_spec("watchfiles") is None
     ):
-        parser.error(
-            "reload requires watchfiles and an unfrozen process"
-        )
+        parser.error("reload requires watchfiles and an unfrozen process")
     if reload and args.mode == "native":
         parser.error("reload cannot run in native mode")
 
