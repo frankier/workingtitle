@@ -11,8 +11,7 @@ Shared helpers for Python web applications:
 
     $ uv add workingtitle
 
-The desktop helpers live behind extras: `workingtitle[desktop]`,
-`workingtitle[desktop-dev]`, and `workingtitle[desktop-build]`.
+The desktop helpers live behind extras: `workingtitle[desktop]`.
 
 ## Documentation
 

@@ -326,12 +326,6 @@ def build_parser(spec: AppSpec, *, add_arguments=None, smoke_test=False):
     parser.add_argument(
         "--mode", choices=("auto", "native", "browser", "server"), default="auto"
     )
-    parser.add_argument(
-        "--no-window", action="store_true", help="Use browser/server mode"
-    )
-    parser.add_argument(
-        "--no-browser", action="store_true", help="Do not open the system browser"
-    )
     parser.add_argument("--reload", action="store_true", help="Reload in browser mode")
     parser.add_argument("--debug", action="store_true", help="Enable debug and reload")
     if smoke_test:
@@ -368,7 +362,7 @@ def run_cli(
         getattr(sys, "frozen", False) or importlib.util.find_spec("watchfiles") is None
     ):
         parser.error(
-            "reload requires a source installation with workingtitle[desktop-dev]"
+            "reload requires watchfiles and an unfrozen process"
         )
     if reload and args.mode == "native":
         parser.error("reload cannot run in native mode")
@@ -392,19 +386,15 @@ def run_cli(
             session.run_reload(
                 args.host,
                 args.port,
-                open_browser=not args.no_browser and args.mode != "server",
+                open_browser=args.mode != "server",
                 assets=assets,
             )
         else:
-            mode = args.mode
-            if args.no_window:
-                mode = "browser"
             session.run(
                 import_object(spec.factory)(),
                 args.host,
                 args.port,
-                mode=mode,
-                open_browser=not args.no_browser,
+                mode=args.mode,
             )
         return 0
     finally:

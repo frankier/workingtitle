@@ -15,13 +15,7 @@ desktop = [
     "uvicorn>=0.30",
     "websockets>=12",
     "pywebview>=6; sys_platform != 'linux'",
-]
-desktop-dev = [
-    "workingtitle[desktop]",
     "watchfiles>=1",
-]
-desktop-build = [
-    "workingtitle[desktop]",
     "pyinstaller>=6",
     "pyinstaller-hooks-contrib",
 ]

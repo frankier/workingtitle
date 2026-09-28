@@ -16,9 +16,6 @@ Install the optional desktop helpers with:
 
     $ uv add "workingtitle[desktop]"
 
-`workingtitle[desktop-dev]` adds `watchfiles` for reload support, and
-`workingtitle[desktop-build]` adds PyInstaller and its contributed hooks.
-
 ```{toctree}
 :maxdepth: 2
 :hidden:

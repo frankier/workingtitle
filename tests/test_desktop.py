@@ -184,13 +184,13 @@ def test_cli_prepares_before_build_and_factory_and_restores_environment(monkeypa
     def launch(app, host, port, **kwargs):
         calls.append("launch")
         assert app == "app"
-        assert kwargs == {"mode": "browser", "open_browser": False}
+        assert kwargs == {"mode": "server"}
 
     monkeypatch.setattr(runtime, "import_object", lambda reference: factory)
     assert (
         run_cli(
             app_spec(),
-            ["--config", "new", "--no-window", "--no-browser"],
+            ["--config", "new", "--mode", "server"],
             add_arguments=lambda parser: parser.add_argument("--config"),
             prepare=prepare,
             assets=SimpleNamespace(ensure_built=build),
@@ -225,7 +225,7 @@ def test_reload_requires_watchfiles(monkeypatch, capsys):
     with pytest.raises(SystemExit) as exc:
         run_cli(app_spec(), ["--reload"])
     assert exc.value.code == 2
-    assert "desktop-dev" in capsys.readouterr().err
+    assert "watchfiles" in capsys.readouterr().err
 
 
 def test_reload_builds_before_restart_and_keeps_environment(monkeypatch):
@@ -255,7 +255,7 @@ def test_reload_builds_before_restart_and_keeps_environment(monkeypatch):
     )
     run_cli(
         app_spec(debug_env_var="EXAMPLE_DEBUG"),
-        ["--debug", "--no-browser"],
+        ["--debug", "--mode", "server"],
         assets=plan,
     )
     assert events == ["build", "build", "restart"]

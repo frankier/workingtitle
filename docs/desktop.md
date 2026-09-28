@@ -4,11 +4,9 @@
 desktop applications. The runtime accepts an ASGI application; it does not
 require Starlette-specific routing.
 
-Install `workingtitle[desktop]` for Uvicorn, WebSockets, and pywebview on Windows
-and macOS. `workingtitle[desktop-dev]` adds watchfiles;
-`workingtitle[desktop-build]` adds PyInstaller and its contributed hooks. Use
-both extras when developing and packaging. Importing `workingtitle.desktop`
-does not load these optional dependencies.
+Install `workingtitle[desktop]` for Uvicorn, WebSockets, watchfiles, PyInstaller
+and its contributed hooks, and pywebview on Windows and macOS. Importing
+`workingtitle.desktop` does not load these optional dependencies.
 
 ## Application and CLI
 
@@ -89,8 +87,6 @@ Common CLI options:
 | `--mode native` | Require a native window; propagate failures |
 | `--mode browser` | Serve and open the system browser |
 | `--mode server` | Serve without opening a window or browser |
-| `--no-window` | Select browser mode, overriding `--mode` |
-| `--no-browser` | Suppress system-browser opening, including fallback; native windows remain enabled |
 | `--reload` | Reload in browser/server mode; requires watchfiles and an unfrozen process |
 | `--debug` | Enable the configured debug environment flag and imply reload |
 | `--smoke-test` | Available only when a smoke callback is supplied |
