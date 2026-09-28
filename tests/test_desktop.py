@@ -102,6 +102,59 @@ def test_native_fallback_rebinds_and_respects_no_browser(monkeypatch):
     assert all(sock.fileno() == -1 for sock in sockets)
 
 
+def test_dialogs_use_the_native_window_and_return_paths(monkeypatch, tmp_path):
+    calls = []
+
+    class Window:
+        def create_file_dialog(self, kind, **kwargs):
+            calls.append((kind, kwargs))
+            selected = kwargs.get("save_filename") and (str(tmp_path / "conf.toml"),)
+            return selected or (str(tmp_path / "a"), str(tmp_path / "b"))
+
+    monkeypatch.setitem(
+        sys.modules,
+        "webview",
+        SimpleNamespace(FileDialog=SimpleNamespace(OPEN=10, FOLDER=20, SAVE=30)),
+    )
+    session = DesktopSession(app_spec())
+    assert not session.native
+    with pytest.raises(RuntimeError, match="no native window"):
+        session.open_folder()
+
+    session.window = Window()
+    assert session.native
+    assert session.open_folder(allow_multiple=True, directory=tmp_path) == (
+        tmp_path / "a",
+        tmp_path / "b",
+    )
+    assert session.open_file(file_types=("Data (*.txt)",)) == (
+        tmp_path / "a",
+        tmp_path / "b",
+    )
+    assert session.save_file(filename="conf.toml") == tmp_path / "conf.toml"
+    assert [kind for kind, _ in calls] == [20, 10, 30]
+    assert calls[0][1] == {
+        "directory": str(tmp_path),
+        "allow_multiple": True,
+        "save_filename": "",
+        "file_types": (),
+    }
+    assert calls[1][1]["file_types"] == ("Data (*.txt)",)
+    assert calls[1][1]["directory"] == ""
+    assert calls[2][1]["save_filename"] == "conf.toml"
+
+
+def test_save_dialog_cancelled_returns_none(monkeypatch):
+    monkeypatch.setitem(
+        sys.modules,
+        "webview",
+        SimpleNamespace(FileDialog=SimpleNamespace(SAVE=30)),
+    )
+    session = DesktopSession(app_spec())
+    session.window = SimpleNamespace(create_file_dialog=lambda *args, **kwargs: None)
+    assert session.save_file() is None
+
+
 def test_bind_failure_closes_socket(monkeypatch):
     sock = socket.socket()
     monkeypatch.setattr(runtime.socket, "socket", lambda *args: sock)

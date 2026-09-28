@@ -14,7 +14,7 @@ dependencies = [
 desktop = [
     "uvicorn>=0.30",
     "websockets>=12",
-    "pywebview>=5; sys_platform != 'linux'",
+    "pywebview>=6; sys_platform != 'linux'",
 ]
 desktop-dev = [
     "workingtitle[desktop]",

@@ -7,6 +7,7 @@ recipes belong to the application, not to this module.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 import shutil
 import sys
@@ -25,7 +26,7 @@ class PackageData:
 @dataclass(frozen=True)
 class Submodules:
     package: str
-    exclude_prefixes: tuple[str, ...] = ()
+    filter: tuple[str, ...] | Callable[[str], bool] = ()
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,11 @@ def platform_options(app: AppSpec, platform: str | None = None):
     return hidden, excludes
 
 
+def _not_excluded(prefixes: tuple[str, ...], name: str) -> bool:
+    """Whether ``name`` lies outside every excluded module prefix."""
+    return not any(name == p or name.startswith(p + ".") for p in prefixes)
+
+
 def analysis_options(spec: BundleSpec):
     """Collect Analysis arguments; call after building frontend assets."""
     from PyInstaller.utils.hooks import (
@@ -105,13 +111,11 @@ def analysis_options(spec: BundleSpec):
     for package in spec.metadata:
         datas += copy_metadata(package)
     for group in spec.submodules:
-        prefixes = group.exclude_prefixes
-        hidden += collect_submodules(
-            group.package,
-            filter=lambda name: (
-                not any(name == p or name.startswith(p + ".") for p in prefixes)
-            ),
-        )
+        if isinstance(group.filter, tuple):
+            predicate = partial(_not_excluded, group.filter)
+        else:
+            predicate = group.filter
+        hidden += collect_submodules(group.package, filter=predicate)
     hooks = [str(root / path) for path in spec.runtime_hooks]
     if spec.matplotlib:
         datas += collect_data_files("matplotlib")

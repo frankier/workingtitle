@@ -100,10 +100,32 @@ smoke test. A smoke callback has signature `smoke_test(args, session) -> int`;
 it bypasses normal `prepare` and factory creation, so it can own temporary
 fixtures and configuration. It runs after asset validation/building.
 
-Applications can attach `SESSION` to their app state and inspect
-`session.window` for native dialogs. It is `None` outside a running native
-window. Invoke pywebview dialogs through that window; application-specific
-dialog behavior stays in the app. The GUI loop must run on the main thread.
+Applications can attach `SESSION` to their app state. `session.native` is true
+while a native window is open, and `session.window` is the underlying pywebview
+window or `None` in browser and server mode. The session also provides blocking
+dialog helpers that return `Path` objects:
+
+| Method | Returns |
+| --- | --- |
+| `open_folder(*, directory=None, allow_multiple=False)` | `tuple[Path, ...]`, empty when cancelled |
+| `open_file(*, directory=None, allow_multiple=False, file_types=())` | `tuple[Path, ...]`, empty when cancelled |
+| `save_file(*, directory=None, filename="", file_types=())` | `Path`, or `None` when cancelled |
+
+`file_types` uses pywebview's `"Description (*.ext1;*.ext2)"` format. The
+helpers raise `RuntimeError` when no window is open, so check `session.native`
+first. They block until the user dismisses the dialog; call them from a worker
+thread:
+
+```python
+from starlette.concurrency import run_in_threadpool
+
+if session.native:
+    chosen = await run_in_threadpool(session.open_folder, allow_multiple=True)
+```
+
+Applications that need behavior beyond these helpers can still use
+`session.window` directly. Application-specific dialog behavior stays in the
+app. The GUI loop must run on the main thread.
 
 `ServerThread(app, bind_socket(...))` is also a context manager for custom
 smoke checks. It owns startup readiness, shutdown, and socket cleanup.

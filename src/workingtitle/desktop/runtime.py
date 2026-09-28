@@ -139,14 +139,79 @@ class ServerThread:
 
 
 class DesktopSession:
-    """Per-launch native window access, suitable for application state."""
+    """Per-launch native window access, suitable for application state.
+
+    The session owns the one native window for a launch. Applications receive
+    it through their own state or a closure and use either ``window`` directly
+    or the dialog convenience methods. The dialog methods block until the user
+    dismisses the dialog; call them from a worker thread, for example with
+    ``starlette.concurrency.run_in_threadpool``.
+    """
 
     def __init__(self, spec: AppSpec):
         self.spec = spec
         self.window = None
 
     def native_window_supported(self):
+        """Whether this platform has a configured native-window backend."""
         return sys.platform in self.spec.native_platforms
+
+    @property
+    def native(self):
+        """Whether a native window is open, and can therefore show dialogs."""
+        return self.window is not None
+
+    def _dialog(
+        self,
+        kind,
+        *,
+        directory=None,
+        allow_multiple=False,
+        save_filename="",
+        file_types=(),
+    ):
+        """Show a pywebview file dialog and return its paths as ``Path``s.
+
+        ``kind`` names a ``webview.FileDialog`` member. pywebview is imported
+        here so a session without a window does not need the GUI installed.
+        """
+        if self.window is None:
+            raise RuntimeError("no native window is available for dialogs")
+        import webview
+
+        chosen = self.window.create_file_dialog(
+            getattr(webview.FileDialog, kind),
+            directory=str(directory) if directory is not None else "",
+            allow_multiple=allow_multiple,
+            save_filename=save_filename,
+            file_types=tuple(file_types),
+        )
+        return tuple(Path(path) for path in chosen or ())
+
+    def open_folder(self, *, directory=None, allow_multiple=False):
+        """Choose directories; return the selection, empty when cancelled."""
+        return self._dialog(
+            "FOLDER", directory=directory, allow_multiple=allow_multiple
+        )
+
+    def open_file(self, *, directory=None, allow_multiple=False, file_types=()):
+        """Choose files; return the selection, empty when cancelled."""
+        return self._dialog(
+            "OPEN",
+            directory=directory,
+            allow_multiple=allow_multiple,
+            file_types=file_types,
+        )
+
+    def save_file(self, *, directory=None, filename="", file_types=()):
+        """Choose a destination; return it, or ``None`` when cancelled."""
+        chosen = self._dialog(
+            "SAVE",
+            directory=directory,
+            save_filename=filename,
+            file_types=file_types,
+        )
+        return chosen[0] if chosen else None
 
     def run_window(self, app, sock, log_level="warning"):
         import webview
