@@ -12,8 +12,9 @@ class ParamError(ValueError):
     """Raised for invalid query parameters outside of model validation.
 
     A subclass of ``ValueError`` so that Pydantic recognises it inside
-    validators and :func:`pydanticstarlette.query_params` recognises it
-    anywhere inside a handler.
+    validators, and so that the ``query_params`` decorator from
+    ``workingtitle.pydanticstarlette`` recognises it anywhere inside a
+    handler.
     """
 
 

@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from pydanticstarlette import (
+from workingtitle.pydanticstarlette import (
     FileStem,
     LenientInt,
     OptionalPositiveInt,

@@ -1,4 +1,4 @@
-# pydanticstarlette
+# workingtitle
 
 Robot text below.
 
@@ -10,7 +10,7 @@ OpenAPI, no dependency injection, no routing changes.
 
 ```python
 from pydantic import BaseModel
-from pydanticstarlette import PositiveInt, Sorters, query_params
+from workingtitle.pydanticstarlette import PositiveInt, Sorters, query_params
 
 
 class ReportParams(BaseModel):
