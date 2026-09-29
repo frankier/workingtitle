@@ -10,7 +10,7 @@ from typing import Any, TypeVar
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
-from .errors import ParamError, error_response
+from .errors import ParamError, error_message
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -68,8 +68,10 @@ def query_params(model: type[BaseModel] | None = None):
     second argument: the handler becomes ``handler(request, params)``.
 
     Validation failures and ``ValueError`` raised anywhere in the handler
-    become a 400 plain-text response naming the problem. Starlette
-    ``HTTPException`` (e.g. 404 for missing resources) propagates untouched.
+    become a Starlette 400 ``HTTPException`` naming the problem, so an app's
+    exception handler can customize the response. Other Starlette
+    ``HTTPException`` instances (e.g. 404 for missing resources) propagate
+    untouched.
     """
 
     def decorate(handler):
@@ -84,7 +86,7 @@ def query_params(model: type[BaseModel] | None = None):
                     result = await result
                 return result
             except ValueError as exc:  # includes ValidationError and ParamError
-                return error_response(exc)
+                raise HTTPException(status_code=400, detail=error_message(exc)) from exc
 
         return endpoint
 

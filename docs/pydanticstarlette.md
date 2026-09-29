@@ -29,10 +29,35 @@ async def report_data(request, params):
     ...  # params is a validated ReportParams
 ```
 
-Invalid input never reaches the handler: it becomes a `400` plain-text
-response naming the offending parameter. `ValueError` raised inside the
-handler body (e.g. "Unknown sort field") also becomes a 400; Starlette
-`HTTPException` (e.g. 404 lookups) propagates untouched.
+Invalid input never reaches the handler: it raises a Starlette
+`HTTPException` with status `400` and a detail naming the offending parameter.
+`ValueError` raised inside the handler body (e.g. "Unknown sort field") also
+becomes a 400; other Starlette `HTTPException` instances (e.g. 404 lookups)
+propagate untouched. Without a custom exception handler, Starlette displays
+the detail in its default plain-text response.
+
+Register a Starlette exception handler to show a custom bad request page:
+
+```python
+from html import escape
+
+from starlette.applications import Starlette
+from starlette.responses import HTMLResponse
+from starlette.routing import Route
+
+
+async def bad_request(request, exc):
+    return HTMLResponse(
+        f"<h1>Bad request</h1><p>{escape(str(exc.detail))}</p>",
+        status_code=400,
+    )
+
+
+app = Starlette(
+    routes=[Route("/reports", report_data)],
+    exception_handlers={400: bad_request},
+)
+```
 
 `@query_params()` with no model wraps a handler purely for the error
 mapping, without injecting anything.
@@ -41,7 +66,7 @@ mapping, without injecting anything.
 
 | Export | Purpose |
 | --- | --- |
-| `query_params(model=None)` | Handler decorator: validate + inject, map errors to 400 |
+| `query_params(model=None)` | Handler decorator: validate + inject, raise 400 for errors |
 | `parse_query(query, model)` | Same parsing outside a handler (e.g. in helpers) |
 | `collect_query_params(query)` | Flattens scalars and `name[i][part]` indexed groups |
 | `LenientInt` | `maybe_int` semantics: unparseable falls back to `None` |

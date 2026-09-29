@@ -2,10 +2,12 @@ import asyncio
 
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from starlette.applications import Starlette
 from starlette.datastructures import QueryParams
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import HTMLResponse, PlainTextResponse
+from starlette.routing import Route
 
 from workingtitle.pydanticstarlette import (
     FileStem,
@@ -37,6 +39,49 @@ def make_request(query_string):
 
 def call(handler, query_string):
     return asyncio.run(handler(make_request(query_string)))
+
+
+def call_app(app, query_string):
+    async def run():
+        messages = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            messages.append(message)
+
+        await app(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "http",
+                "path": "/",
+                "raw_path": b"/",
+                "query_string": query_string.encode(),
+                "headers": [],
+                "server": ("testserver", 80),
+                "client": ("testclient", 12345),
+                "root_path": "",
+            },
+            receive,
+            send,
+        )
+        status = next(
+            message["status"]
+            for message in messages
+            if message["type"] == "http.response.start"
+        )
+        body = b"".join(
+            message.get("body", b"")
+            for message in messages
+            if message["type"] == "http.response.body"
+        )
+        return status, body
+
+    return asyncio.run(run())
 
 
 class TestLenientInt:
@@ -206,15 +251,38 @@ class TestQueryParamsDecorator:
     def test_injects_validated_params(self):
         assert call(item_handler, "page=3").body == b"3"
 
-    def test_invalid_params_become_400(self):
-        response = call(item_handler, "page=0")
-        assert response.status_code == 400
-        assert b"page" in response.body
+    def test_invalid_params_raise_400(self):
+        with pytest.raises(HTTPException) as excinfo:
+            call(item_handler, "page=0")
+        assert excinfo.value.status_code == 400
+        assert "page" in excinfo.value.detail
 
-    def test_handler_value_errors_become_400(self):
-        response = call(bare_handler, "")
-        assert response.status_code == 400
-        assert b"bad thing" in response.body
+    def test_handler_value_errors_raise_400(self):
+        with pytest.raises(HTTPException) as excinfo:
+            call(bare_handler, "")
+        assert excinfo.value.status_code == 400
+        assert excinfo.value.detail == "bad thing"
+
+    def test_custom_400_handler_renders_bad_request_page(self):
+        async def bad_request(request, exc):
+            return HTMLResponse(
+                f"<h1>Bad request</h1><p>{exc.detail}</p>", status_code=400
+            )
+
+        app = Starlette(
+            routes=[Route("/", item_handler)],
+            exception_handlers={400: bad_request},
+        )
+        status, body = call_app(app, "page=0")
+        assert status == 400
+        assert b"<h1>Bad request</h1>" in body
+        assert b"page" in body
+
+    def test_default_400_handler_uses_exception_detail(self):
+        app = Starlette(routes=[Route("/", item_handler)])
+        status, body = call_app(app, "page=0")
+        assert status == 400
+        assert b"page" in body
 
     def test_http_exceptions_propagate(self):
         @query_params()
