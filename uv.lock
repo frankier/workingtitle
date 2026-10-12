@@ -1823,6 +1823,12 @@ desktop = [
     { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
+devserver = [
+    { name = "uvicorn" },
+    { name = "watchfiles" },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1856,10 +1862,13 @@ requires-dist = [
     { name = "pywebview", marker = "sys_platform != 'linux' and extra == 'desktop'", specifier = ">=6" },
     { name = "starlette", specifier = ">=0.37" },
     { name = "uvicorn", marker = "extra == 'desktop'", specifier = ">=0.30" },
+    { name = "uvicorn", marker = "extra == 'devserver'", specifier = ">=0.30" },
     { name = "watchfiles", marker = "extra == 'desktop'", specifier = ">=1" },
+    { name = "watchfiles", marker = "extra == 'devserver'", specifier = ">=1" },
     { name = "websockets", marker = "extra == 'desktop'", specifier = ">=12" },
+    { name = "websockets", marker = "extra == 'devserver'", specifier = ">=12" },
 ]
-provides-extras = ["desktop"]
+provides-extras = ["devserver", "desktop"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8" }]

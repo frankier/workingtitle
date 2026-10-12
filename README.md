@@ -4,6 +4,7 @@ Shared helpers for Python web applications:
 
 - `workingtitle.pydanticstarlette`: query-parameter validation for plain
   Starlette applications, backed by Pydantic models.
+- `workingtitle.devserver`: incremental asset builds and headless ASGI reload.
 - `workingtitle.desktop`: ASGI desktop launching, frontend builds, and
   PyInstaller packaging.
 
@@ -11,6 +12,7 @@ Shared helpers for Python web applications:
 
     $ uv add workingtitle
 
+Headless serving uses `workingtitle[devserver]`; see [the guide](docs/devserver.md).
 The desktop helpers live behind extras: `workingtitle[desktop]`.
 
 ## Documentation

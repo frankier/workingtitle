@@ -12,31 +12,21 @@ import importlib
 import importlib.util
 import os
 from pathlib import Path
-import socket
+import socket as socket
 import sys
 import threading
 import time
-from typing import Any, Callable, Mapping
+from typing import Callable, Mapping
 import webbrowser
+
+from ..devserver import ReloadSpec, run_server
+from ..devserver._shared import bind_socket, import_object, socket_url
 
 
 @dataclass(frozen=True)
 class WindowSpec:
     width: int = 1400
     height: int = 900
-
-
-@dataclass(frozen=True)
-class ReloadSpec:
-    directories: tuple[Path, ...] = ()
-    includes: tuple[str, ...] = ("*.py",)
-    excludes: tuple[str, ...] = (
-        "node_modules",
-        ".venv",
-        "build",
-        "dist",
-        ".desktop-build",
-    )
 
 
 @dataclass(frozen=True)
@@ -49,39 +39,6 @@ class AppSpec:
     native_platforms: tuple[str, ...] = ("win32", "darwin")
     debug_env_var: str | None = None
     reload: ReloadSpec = field(default_factory=ReloadSpec)
-
-
-def import_object(reference: str) -> Any:
-    """Resolve a ``module:attribute`` reference without importing it earlier."""
-    module, separator, attribute = reference.partition(":")
-    if not separator or not module or not attribute:
-        raise ValueError(f"expected module:attribute, got {reference!r}")
-    value = importlib.import_module(module)
-    for part in attribute.split("."):
-        value = getattr(value, part)
-    return value
-
-
-def bind_socket(host="127.0.0.1", port=0):
-    """Bind before reporting the URL, including when choosing a free port."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((host, port))
-        sock.listen(128)
-        sock.set_inheritable(True)
-    except BaseException:
-        sock.close()
-        raise
-    return sock
-
-
-def socket_url(sock):
-    host, port = sock.getsockname()[:2]
-    # A wildcard bind address is not a browser destination.
-    if host == "0.0.0.0":
-        host = "127.0.0.1"
-    return f"http://{host}:{port}/"
 
 
 class ServerThread:
@@ -272,51 +229,15 @@ class DesktopSession:
             sock.close()
 
     def run_reload(self, host, port, *, open_browser=True, assets=None):
-        import uvicorn
-        from uvicorn.supervisors import ChangeReload
-
-        class BuildOnReload(ChangeReload):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                if assets is not None:
-                    self.watch_filter = assets.watch_filter(self.watch_filter)
-
-            def restart(self):
-                if assets is not None:
-                    try:
-                        assets.ensure_built()
-                    except Exception as exc:
-                        # Keep serving the previous app while the user fixes
-                        # the sources; a later edit retries the build.
-                        print(f"Asset rebuild failed: {exc}", file=sys.stderr)
-                        return
-                super().restart()
-
-        options = self.spec.reload
-        with bind_socket(host, port) as sock:
-            config = uvicorn.Config(
-                self.spec.factory,
-                factory=True,
-                reload=True,
-                reload_dirs=[str(p) for p in options.directories]
-                + ([str(assets.root)] if assets is not None else []),
-                reload_includes=list(options.includes),
-                reload_excludes=list(options.excludes),
-                ws="websockets",
-                log_level="info",
-            )
-            server = uvicorn.Server(config)
-            url = socket_url(sock)
-            print(
-                f"{self.spec.title} running at {url}  (reload enabled, Ctrl-C to quit)",
-                flush=True,
-            )
-            if open_browser:
-                webbrowser.open(url)
-            try:
-                BuildOnReload(config, target=server.run, sockets=[sock]).run()
-            except KeyboardInterrupt:
-                pass
+        run_server(
+            self.spec.factory,
+            factory=True,
+            host=host,
+            port=port,
+            reload=self.spec.reload,
+            assets=assets,
+            on_ready=webbrowser.open if open_browser else None,
+        )
 
 
 def build_parser(spec: AppSpec, *, add_arguments=None, smoke_test=False):
@@ -376,7 +297,7 @@ def run_cli(
     previous = {key: os.environ.get(key) for key in environment}
     try:
         os.environ.update(environment)
-        if assets is not None:
+        if assets is not None and not reload:
             assets.ensure_built()
         if args.smoke_test:
             return smoke_test(args, session)

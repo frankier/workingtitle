@@ -303,7 +303,7 @@ def test_failed_build_is_retried(tmp_path, monkeypatch):
         with pytest.raises(RuntimeError, match="bad source"):
             plan.ensure_built()
     assert len(calls) == 2
-    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+    assert not (tmp_path / ".workingtitle-build/frontend.json").exists()
 
 
 def test_python_action_receives_build_context(tmp_path, monkeypatch):
@@ -336,10 +336,10 @@ def test_fallback_to_stale_assets_is_retried(tmp_path, monkeypatch):
     plan.ensure_built()
     assert (tmp_path / "out.js").read_text() == "stale"
     # A fallback is not stamped, so the next call retries the step.
-    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+    assert not (tmp_path / ".workingtitle-build/frontend.json").exists()
     plan.ensure_built()
     assert (tmp_path / "out.js").read_text() == "fresh"
-    assert (tmp_path / ".desktop-build/frontend.json").is_file()
+    assert (tmp_path / ".workingtitle-build/frontend.json").is_file()
     assert calls == [False, False]
 
 
@@ -354,7 +354,7 @@ def test_strict_fallback_raises_and_is_not_stamped(tmp_path, monkeypatch):
     monkeypatch.setattr(assets, "import_object", lambda reference: build)
     with pytest.raises(assets.BuildUnavailable, match="stale only"):
         plan.ensure_built(force=True, strict=True)
-    assert not (tmp_path / ".desktop-build/frontend.json").exists()
+    assert not (tmp_path / ".workingtitle-build/frontend.json").exists()
 
 
 def test_fallback_without_stale_outputs_raises(tmp_path, monkeypatch):
@@ -453,7 +453,7 @@ def test_asset_reload_filter(tmp_path):
         "src/js/generated.js",
         "node_modules/a.ts",
         "src/ext/node_modules/a.ts",
-        ".desktop-build/web.json",
+        ".workingtitle-build/web.json",
     ):
         assert not accepts(tmp_path / name), name
 

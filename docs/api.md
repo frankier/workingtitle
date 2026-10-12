@@ -21,12 +21,21 @@ functions, so autodoc needs to be pointed at them explicitly:
 .. autodata:: workingtitle.pydanticstarlette.Sorters
 ```
 
+## `workingtitle.devserver`
+
+```{eval-rst}
+.. automodule:: workingtitle.devserver
+   :members:
+   :undoc-members:
+```
+
 ## `workingtitle.desktop`
 
 ```{eval-rst}
 .. automodule:: workingtitle.desktop
    :members:
    :undoc-members:
+   :exclude-members: AssetPlan, BuildContext, BuildUnavailable, NpmBuild, PythonBuild, ReloadSpec
 ```
 
 ### `workingtitle.desktop.freezing`
