@@ -21,6 +21,7 @@ Install the optional desktop helpers with:
 :hidden:
 
 pydanticstarlette
+devserver
 desktop
 api
 ```

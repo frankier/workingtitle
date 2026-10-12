@@ -11,6 +11,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+devserver = [
+    "uvicorn>=0.30",
+    "websockets>=12",
+    "watchfiles>=1",
+]
 desktop = [
     "uvicorn>=0.30",
     "websockets>=12",

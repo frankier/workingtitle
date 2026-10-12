@@ -172,7 +172,7 @@ Override `install_args` if a project's dependencies require install scripts.
 
 Build fingerprints include filenames and contents, so source deletion and
 renaming also cause a rebuild. Missing output files cause a rebuild. Fingerprint
-state lives under `.desktop-build/`; add that directory to the application's
+state lives under `.workingtitle-build/`; add that directory to the application's
 ignore file. Do not run concurrent builds against the same output tree.
 
 Python actions are lazy `module:attribute` references to callables. An action
@@ -255,3 +255,7 @@ Tests cover real loopback server startup/shutdown, native fallback cleanup,
 CLI preparation/reload ordering, incremental builds, npm lock changes, asset
 watch filtering, and packaging construction. Full application builds and
 native Windows/macOS GUI tests belong to the later integration stage.
+
+Asset builds and reload are shared with [the headless devserver](devserver.md).
+Existing desktop imports remain supported. Pass `cache_dir=".desktop-build"`
+to reuse the former default cache; otherwise the new default rebuilds once.
