@@ -10,6 +10,7 @@ from bokeh.layouts import column, row
 from bokeh.resources import INLINE
 from playwright.sync_api import expect
 
+from workingtitle.bokeh.panels import PlacementSelector
 from workingtitle.bokeh.widgets import HelpIcon
 from workingtitle.bokeh.workspace import FrameFullscreen, Sidebar
 
@@ -49,3 +50,21 @@ def test_help_and_sidebar_across_fullscreen(page, tmp_path):
     expect(help_button).to_be_visible()
     page.evaluate("document.exitFullscreen()")
     expect(help_button).to_be_hidden()
+
+
+def test_placement_icons_and_keyboard_selection(page, tmp_path):
+    selector = PlacementSelector(("right", "bottom"))
+    path = tmp_path / "placements.html"
+    path.write_text(file_html(selector.widget, INLINE))
+    page.goto(path.as_uri())
+    bottom = page.get_by_role("button", name="Bottom", exact=True)
+    right = page.get_by_role("button", name="Right (half width)", exact=True)
+    expect(page.get_by_role("button")).to_have_count(2)
+    for button in (right, bottom):
+        assert button.evaluate(
+            "el => getComputedStyle(el, '::before').maskImage"
+        ).startswith('url("data:image/svg+xml,')
+    bottom.focus()
+    bottom.press("Enter")
+    bottom.click()
+    expect(page.locator("button.bk-active")).to_have_text("Bottom")

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from .browser import ON_FRAME
+from .panels import PanelMode as PanelMode
 
 from bokeh.events import DocumentReady
 from bokeh.layouts import column
@@ -178,36 +179,6 @@ class Sidebar:
         )
         self.toggle.js_on_change("active", sync)
         fullscreen.state.js_on_change("text", sync)
-
-
-@dataclass
-class PanelMode:
-    """The two-panel preferences for one display mode."""
-
-    left: bool = True
-    right: bool = False
-    placement: str = "sidebar"
-
-    def fit(self, narrow):
-        if narrow and self.right and self.placement != "bottom":
-            self.left = False
-
-    def toggle(self, side, active, narrow):
-        if side == "left":
-            self.left = active
-            if active and self.placement != "bottom":
-                self.placement = "sidebar"
-                if narrow:
-                    self.right = False
-        else:
-            self.right = active
-            self.placement = "sidebar"
-        self.fit(narrow)
-
-    def place(self, placement):
-        self.placement = placement
-        if placement == "right":
-            self.left = False
 
 
 SCROLL_STYLES = {
