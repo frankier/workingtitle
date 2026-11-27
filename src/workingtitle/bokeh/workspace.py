@@ -244,17 +244,17 @@ def observe_panel_width(doc, panel):
             + """
             const view = Bokeh.index.find_one(panel);
             if (!view || view.el.workingtitleWidthObserver) return;
-            let previousWidth;
+            let previousWidth = view.el.getBoundingClientRect().width;
             const observer = new ResizeObserver(([entry]) => {
-                const width = entry.contentRect.width;
+                const width = entry.borderBoxSize[0].inlineSize;
                 if (!width || width === previousWidth) return;
                 previousWidth = width;
                 onFrame(view, 'workingtitleLayoutFrame', () => {
-                    if (view.el.isConnected) view.invalidate_layout();
+                    if (view.el.isConnected) view.compute_layout();
                 });
             });
             view.el.workingtitleWidthObserver = observer;
-            observer.observe(view.el);
+            observer.observe(view.el, {box: "border-box"});
         """,
         ),
     )

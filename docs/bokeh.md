@@ -57,5 +57,5 @@ After changing the TypeScript, build with Bokeh 3.10.2 and Node.js using
 
 When CSS flex sizing changes a panel's width independently of the outer frame,
 register `observe_panel_width(doc, panel)` during document construction. It
-invalidates Bokeh's cached layout once the panel has a positive new width,
+recomputes Bokeh's geometry once the panel has a positive new width,
 keeping the canvas and pointer coordinates aligned with their visible area.
