@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from .browser import ON_FRAME
+
 from bokeh.events import DocumentReady
 from bokeh.layouts import column
 from bokeh.models import (
@@ -23,7 +25,16 @@ from bokeh.models import (
 class FrameFullscreen:
     """Bind toolbar actions and buttons to the same frame and observable mode."""
 
-    def __init__(self, frame, *, state=None, dialogs=(), overflow="auto", padding=8):
+    def __init__(
+        self,
+        frame,
+        *,
+        document=None,
+        state=None,
+        dialogs=(),
+        overflow="auto",
+        padding=8,
+    ):
         self.state = Div(text="normal", visible=False) if state is None else state
         frame.stylesheets = [
             *frame.stylesheets,
@@ -55,7 +66,8 @@ class FrameFullscreen:
                 element.workingtitleFullscreen();
             }
         """
-        frame.js_on_event(DocumentReady, CustomJS(args=args, code=observe))
+        if document is not None:
+            document.js_on_event(DocumentReady, CustomJS(args=args, code=observe))
         self.callback = CustomJS(
             args=args,
             code=observe
@@ -220,6 +232,32 @@ class TwoPanelLayout(Protocol):
     right_controls: Column
     left_toggle: Toggle
     right_toggle: Toggle
+
+
+def observe_panel_width(doc, panel):
+    """Recompute Bokeh canvas geometry after the flex panel reaches its new width."""
+    doc.js_on_event(
+        DocumentReady,
+        CustomJS(
+            args=dict(panel=panel),
+            code=ON_FRAME
+            + """
+            const view = Bokeh.index.find_one(panel);
+            if (!view || view.el.workingtitleWidthObserver) return;
+            let previousWidth;
+            const observer = new ResizeObserver(([entry]) => {
+                const width = entry.contentRect.width;
+                if (!width || width === previousWidth) return;
+                previousWidth = width;
+                onFrame(view, 'workingtitleLayoutFrame', () => {
+                    if (view.el.isConnected) view.invalidate_layout();
+                });
+            });
+            view.el.workingtitleWidthObserver = observer;
+            observer.observe(view.el);
+        """,
+        ),
+    )
 
 
 def apply_layout(

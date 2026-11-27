@@ -54,3 +54,8 @@ extension and the wheel includes its compiled browser code. Frozen builds
 should collect the extension's `bokeh.ext.json`, `package.json` and `dist/*.js`.
 After changing the TypeScript, build with Bokeh 3.10.2 and Node.js using
 `bokeh build src/workingtitle_bokeh` and commit the rebuilt JavaScript.
+
+When CSS flex sizing changes a panel's width independently of the outer frame,
+register `observe_panel_width(doc, panel)` during document construction. It
+invalidates Bokeh's cached layout once the panel has a positive new width,
+keeping the canvas and pointer coordinates aligned with their visible area.
