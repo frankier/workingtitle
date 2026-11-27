@@ -1,11 +1,16 @@
 """Fullscreen controls and collapsible panels for mounted Bokeh layouts."""
 
 from dataclasses import dataclass
+from typing import Literal, Protocol
 
+from bokeh.events import DocumentReady
 from bokeh.layouts import column
 from bokeh.models import (
     BuiltinIcon,
     Button,
+    Column,
+    LayoutDOM,
+    Row,
     CustomAction,
     CustomJS,
     Div,
@@ -31,23 +36,30 @@ class FrameFullscreen:
             ),
         ]
         args = dict(viewer_frame=frame, state=self.state, dialogs=list(dialogs))
-        self.callback = CustomJS(
-            args=args,
-            code="""
+        observe = """
             const view = Bokeh.index.find_one(viewer_frame);
             const element = view?.el;
             if (!element) return;
             if (!element.workingtitleFullscreen) {
                 element.workingtitleFullscreen = () => {
                     const full = document.fullscreenElement === element;
-                    state.text = full ? "full" : "normal";
+                    const mode = full ? "full" : "normal";
+                    if (state.text === mode) return;
+                    state.text = mode;
                     for (const dialog of dialogs) {
                         const el = Bokeh.index.find_one(dialog)?.el;
                         if (dialog.visible && el) (full ? view.shadow_el : document.body).append(el);
                     }
                 };
                 element.addEventListener("fullscreenchange", element.workingtitleFullscreen);
+                element.workingtitleFullscreen();
             }
+        """
+        frame.js_on_event(DocumentReady, CustomJS(args=args, code=observe))
+        self.callback = CustomJS(
+            args=args,
+            code=observe
+            + """
             if (document.fullscreenElement === element) void document.exitFullscreen();
             else if (!document.fullscreenElement) void element.requestFullscreen();
         """,
@@ -90,12 +102,12 @@ def prepare_toolbar(plot):
 class Sidebar:
     """A collapsible rail whose toggle and content stay in the document."""
 
-    shell: object
-    content: object
+    shell: Column
+    content: LayoutDOM
     toggle: Toggle
-    widths: tuple
-    labels: tuple
-    button_widths: tuple
+    widths: tuple[int, int]
+    labels: tuple[str, str]
+    button_widths: tuple[int, int]
 
     @classmethod
     def create(
@@ -195,9 +207,24 @@ SCROLL_STYLES = {
 }
 
 
+class TwoPanelLayout(Protocol):
+    """Mounted components used to lay out controls, central plots and details."""
+
+    frame: Column
+    body: Row
+    workspace: Row
+    center: Column
+    left: Column
+    right: Column
+    left_controls: Column
+    right_controls: Column
+    left_toggle: Toggle
+    right_toggle: Toggle
+
+
 def apply_layout(
-    ui,
-    layout,
+    ui: TwoPanelLayout,
+    layout: Literal["viewport", "contained", "page"],
     *,
     full=False,
     bottom=False,

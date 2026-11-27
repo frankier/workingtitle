@@ -41,5 +41,6 @@ jobs:
           python-version: "3.12"
       - run: uv build --wheel
       - run: uv venv --python 3.12
-      - run: uv pip install dist/*.whl "bokeh==${{ matrix.version }}" markupsafe pytest
-      - run: .venv/bin/python -m pytest tests/test_bokeh.py
+      - run: uv pip install dist/*.whl "bokeh==${{ matrix.version }}" markupsafe pytest pytest-playwright
+      - run: .venv/bin/playwright install --with-deps chromium
+      - run: .venv/bin/python -m pytest tests/test_bokeh.py tests/test_bokeh_browser.py
