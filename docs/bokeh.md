@@ -38,7 +38,7 @@ narrow embedded frame behaves the same way as a narrow browser window.
 from workingtitle.bokeh.panels import PlacementSelector, ResponsivePanels
 
 panels = ResponsivePanels(doc, frame, breakpoint=800)
-selector = PlacementSelector(("sidebar", "bottom", "right"), visible=False)
+selector = PlacementSelector(("sidebar", "bottom", "right"), panel=details)
 details_header.children.append(selector.widget)
 
 def place_details(placement):
@@ -57,7 +57,8 @@ callbacks so a programmatic update is not treated as a user request. Below
 the breakpoint, opening one rail closes the other. A bottom panel can coexist
 with the left rail. Normal and fullscreen modes retain separate preferences.
 
-The selector accepts an ordered subset of placements. Its accessible buttons
+The selector accepts an ordered subset of placements. Pass the details panel
+to keep its buttons visible only while the panel is open. Its accessible buttons
 support mouse and keyboard selection, including standalone HTML. In a server
 document, `on_change` receives the selected placement name. Applications
 choose when details open and which content to show.

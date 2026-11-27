@@ -20,7 +20,7 @@ class PlacementSelector:
     """A native single-choice Bokeh widget with icon buttons and named placements."""
 
     def __init__(
-        self, placements=tuple(_PLACEMENTS), *, placement=None, name=None, visible=True
+        self, placements=tuple(_PLACEMENTS), *, placement=None, name=None, panel=None
     ):
         self._placements = tuple(placements)
         if not self._placements or len(set(self._placements)) != len(self._placements):
@@ -57,8 +57,15 @@ class PlacementSelector:
             height=32,
             margin=0,
             name=name,
-            visible=visible,
+            visible=panel is None or panel.visible,
         )
+
+        if panel is not None:
+            panel.js_link("visible", self.widget, "visible")
+            panel.on_change("visible", self._panel_visibility_changed)
+
+    def _panel_visibility_changed(self, attr, old, visible):
+        self.widget.visible = visible
 
     @property
     def placement(self):

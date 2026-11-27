@@ -70,7 +70,11 @@ def test_workspace_breakpoint_and_per_mode_placement():
 
 
 def test_observe_named_placement_in_supplied_order():
-    selector = PlacementSelector(("bottom", "right"), placement="right")
+    details = Div(visible=False)
+    selector = PlacementSelector(("bottom", "right"), placement="right", panel=details)
+    assert not selector.widget.visible
+    details.visible = True
+    assert selector.widget.visible
     changes = []
     selector.on_change(changes.append)
     selector.widget.active = 0
