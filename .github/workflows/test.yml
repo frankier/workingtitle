@@ -28,3 +28,19 @@ jobs:
 
       - name: Run tests
         run: uv run --locked pytest
+
+  bokeh:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: ["3.10", "3.10.2"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build --wheel
+      - run: uv venv --python 3.12
+      - run: uv pip install dist/*.whl "bokeh==${{ matrix.version }}" markupsafe pytest pytest-playwright
+      - run: .venv/bin/playwright install --with-deps chromium
+      - run: .venv/bin/python -m pytest tests/test_bokeh.py tests/test_bokeh_browser.py

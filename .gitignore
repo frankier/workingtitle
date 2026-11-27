@@ -3,6 +3,7 @@ __pycache__/
 *.py[oc]
 build/
 dist/
+!src/workingtitle_bokeh/dist/
 wheels/
 *.egg-info
 
