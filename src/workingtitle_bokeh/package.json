@@ -1,0 +1,12 @@
+{
+  "name": "workingtitle_bokeh",
+  "version": "0.0.1",
+  "description": "",
+  "license": "MIT",
+  "keywords": [],
+  "repository": {},
+  "dependencies": {
+    "@bokeh/bokehjs": "3.10.2"
+  },
+  "main": "dist/workingtitle_bokeh.js"
+}

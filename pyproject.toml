@@ -11,6 +11,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+bokeh = ["bokeh>=3.10,<3.11; python_version >= '3.12'", "markupsafe>=2"]
 devserver = [
     "uvicorn>=0.30",
     "websockets>=12",
@@ -48,4 +49,4 @@ requires = ["uv_build >= 0.11.7, <0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "workingtitle"
+module-name = ["workingtitle", "workingtitle_bokeh"]
