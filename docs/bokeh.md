@@ -91,3 +91,37 @@ When CSS flex sizing changes a panel's width independently of the outer frame,
 register `observe_panel_width(doc, panel)` during document construction. It
 recomputes Bokeh's geometry once the panel has a positive new width,
 keeping the canvas and pointer coordinates aligned with their visible area.
+
+## Numeric ranges and sliders
+
+Use `workingtitle.bokeh.ranges.fit_viewport(saved, bounds, min_interval=...)`
+when rebuilding a plot. It keeps the saved span when possible, expands a
+too-small interval around its center, and shifts it inside the data extent.
+Supply ascending numeric bounds and compute any domain-specific zoom floor in
+the application. For a mounted plot, `update_reset_range(plot.x_range, lo, hi)`
+updates the Reset destination and follows it while the user is at the default
+view. An explicit zoom survives the update.
+
+`range_scrollbar(plot.x_range, (lo, hi))` returns a horizontal Bokeh range
+slider bound to the plot in both directions. Pass `orientation="vertical"`
+for a vertical track. The slider inherits the axis minimum interval by default
+and enforces it at both data edges. Navigation stays in the browser.
+
+For expensive server work, attach a commit callback to a numeric slider:
+
+```python
+from workingtitle.bokeh.sliders import on_range_commit
+
+on_range_commit(doc, slider, load_interval, pause_ms=150)
+```
+
+The callback receives two numbers. Releasing a handle commits immediately;
+holding still commits after the configured pause (100 ms by default). While a
+request is outstanding the browser retains the newest committed interval.
+The helper acknowledges processed requests and filters duplicate releases.
+Read the committed interval from the callback arguments. The server-side slider
+value does not track browser previews. Application callbacks can validate identifiers and enforce domain-specific
+constraints. Python assignments to the slider invoke the callback directly.
+
+For a Boolean control, `workingtitle.bokeh.widgets.checkbox(label, checked=True)`
+creates a wrapping one-option checkbox group. Read it with `enabled(widget)`.

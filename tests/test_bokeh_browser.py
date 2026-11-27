@@ -68,3 +68,69 @@ def test_placement_icons_and_keyboard_selection(page, tmp_path):
     bottom.press("Enter")
     bottom.click()
     expect(page.locator("button.bk-active")).to_have_text("Bottom")
+
+
+def test_scrollbar_fits_each_edge_and_follows_external_zoom(page, tmp_path):
+    from bokeh.models import Range1d
+    from workingtitle.bokeh.ranges import range_scrollbar
+
+    axis = Range1d(2, 5, min_interval=3, name="axis")
+    track = range_scrollbar(axis, (0, 10), name="track")
+    path = tmp_path / "scrollbar.html"
+    path.write_text(file_html(track, INLINE))
+    page.goto(path.as_uri())
+    page.wait_for_function("window.Bokeh?.documents[0]?.is_idle")
+    for value, expected in [([0, 1], [0, 3]), ([9, 10], [7, 10]), ([4, 5], [3, 6])]:
+        page.evaluate(
+            "v => Bokeh.documents[0].get_model_by_name('track').value = v", value
+        )
+        page.wait_for_function(
+            """([lo, hi]) => {
+            const d = Bokeh.documents[0], axis = d.get_model_by_name("axis");
+            const [a, b] = d.get_model_by_name("track").value;
+            return axis.start === lo && axis.end === hi && a === lo && b === hi;
+        }""",
+            arg=expected,
+        )
+    page.evaluate("Bokeh.documents[0].get_model_by_name('axis').setv({start:1,end:8})")
+    page.wait_for_function(
+        "Bokeh.documents[0].get_model_by_name('track').value.join() === '1,8'"
+    )
+
+
+def test_slow_range_consumer_receives_only_latest_pending_value(page, tmp_path):
+    from types import SimpleNamespace
+    from bokeh.document import Document
+    from bokeh.models import RangeSlider
+    from workingtitle.bokeh.sliders import on_range_commit
+
+    doc = Document()
+    slider = RangeSlider(name="slider", start=0, end=10, value=(0, 10))
+    # Manually acknowledge requests to hold the first one in flight.
+    on_range_commit(
+        SimpleNamespace(session_context=object(), js_on_event=doc.js_on_event),
+        slider,
+        lambda low, high: None,
+        pause_ms=10,
+        name="requests",
+    )
+    doc.add_root(slider)
+    path = tmp_path / "commits.html"
+    path.write_text(file_html(doc, INLINE))
+    page.goto(path.as_uri())
+    page.wait_for_function("window.Bokeh?.documents[0]?.is_idle")
+    page.evaluate("""() => {
+        window.slider = Bokeh.documents[0].get_model_by_name('slider');
+        window.requests = Bokeh.documents[0].get_model_by_name('requests');
+        slider.value = [1, 8];
+    }""")
+    page.wait_for_function("requests.text === '[1,1,8]'")
+    page.evaluate("""async () => {
+        slider.value = [2, 8];
+        await new Promise(resolve => setTimeout(resolve, 50));
+        slider.value = [3, 8];
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }""")
+    assert page.evaluate("requests.text") == "[1,1,8]"
+    page.evaluate("requests.tags = [1]")
+    page.wait_for_function("requests.text === '[2,3,8]'")

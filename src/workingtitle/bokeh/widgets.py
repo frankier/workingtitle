@@ -2,13 +2,13 @@
 
 from typing import TYPE_CHECKING
 
-from bokeh.models import GroupBox, InlineStyleSheet
+from bokeh.models import CheckboxGroup, GroupBox, InlineStyleSheet
 
 
 if TYPE_CHECKING:
     from workingtitle_bokeh.help_icon import HelpIcon
 
-__all__ = ["HelpIcon", "control_group"]
+__all__ = ["CHECKBOX_CSS", "HelpIcon", "checkbox", "enabled", "control_group"]
 
 
 def __getattr__(name):
@@ -35,3 +35,27 @@ def control_group(title, child, *, scrolling=False, **kwargs):
     return GroupBox(
         title=title, child=child, stylesheets=stylesheets, **(options | kwargs)
     )
+
+
+CHECKBOX_CSS = """
+    .bk-input-group { white-space: normal; }
+    label { display: flex; align-items: center; width: 100%; }
+    input { flex-shrink: 0; }
+    span { min-width: 0; overflow-wrap: anywhere; }
+"""
+
+
+def checkbox(label, checked=False, **options):
+    """Create a one-option checkbox group with a wrapping label."""
+    stylesheets = [InlineStyleSheet(css=CHECKBOX_CSS), *options.pop("stylesheets", [])]
+    return CheckboxGroup(
+        labels=[label],
+        active=[0] if checked else [],
+        stylesheets=stylesheets,
+        **options,
+    )
+
+
+def enabled(checkbox):
+    """Return the checked state of a one-option group."""
+    return bool(checkbox.active)
